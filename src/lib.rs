@@ -2,44 +2,17 @@ use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderValue};
 use reqwest::{Client as ReqwestClient, Method};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use thiserror::Error;
 
 // --- Константы ---
 const CRYPTOMUS_API_BASE_URL: &str = "https://api.cryptomus.com/v1/";
 const MERCHANT_HEADER: &str = "merchant";
 const SIGN_HEADER: &str = "sign";
 
-// --- Ошибки ---
+pub type CryptomusError = Box<dyn std::error::Error + Send + Sync>;
 
-#[derive(Error, Debug)]
-pub enum CryptomusError {
-    #[error("Ошибка сети или HTTP запроса: {0}")]
-    Reqwest(#[from] reqwest::Error),
-
-    #[error("Ошибка сериализации/десериализации JSON: {0}")]
-    Serde(#[from] serde_json::Error),
-
-    #[error("Ошибка API Cryptomus (State: {state}): {message:?} {errors:?}")]
-    ApiError {
-        state: i64,
-        message: Option<String>,
-        errors: Option<serde_json::Value>, // Может содержать детальные ошибки валидации
-    },
-
-    #[error("Неверное значение заголовка: {0}")]
-    InvalidHeaderValue(#[from] reqwest::header::InvalidHeaderValue),
-
-    #[error("Отсутствует API ключ для генерации подписи")]
-    MissingApiKey,
-
-    #[error("Ошибка парсинга URL: {0}")]
-    UrlParse(#[from] url::ParseError), // Хотя URL базовый, ошибка парсинга все еще возможна
-}
-
-// --- Вспомогательная функция для генерации подписи ---
 fn generate_signature(payload_str: &str, api_key: &str) -> Result<String, CryptomusError> {
     if api_key.is_empty() {
-        return Err(CryptomusError::MissingApiKey);
+        return Err("missing api key".into());
     }
     let encoded_payload = base64::Engine::encode(
         &base64::engine::general_purpose::STANDARD,
@@ -271,22 +244,10 @@ impl CryptomusClient {
 
             match serde_json::from_str::<GenericCryptomusResponse<()>>(&response_text) {
                 Ok(err_resp) => {
-                    return Err(CryptomusError::ApiError {
-                        state: err_resp.state,
-                        message: err_resp.message,
-                        errors: err_resp.errors,
-                    });
+                    return Err(err_resp.message.unwrap().into());
                 }
                 Err(_) => {
-                    return Err(CryptomusError::ApiError {
-                        state: status.as_u16() as i64,
-                        message: Some(format!(
-                            "Не удалось обработать ответ API. HTTP Статус: {}. Тело: {}",
-                            status,
-                            response_text // Включаем тело ответа в сообщение об ошибке
-                        )),
-                        errors: None, // Не смогли извлечь детальные ошибки
-                    });
+                    return Err(response_text.into());
                 }
             }
         }
@@ -296,30 +257,21 @@ impl CryptomusClient {
         // println!("Response Body (Success): {}", response_text); // Для отладки
         let parsed_response: GenericCryptomusResponse<R> = serde_json::from_str(&response_text)?;
 
-        // Проверяем поле state уже в успешно десериализованном ответе
         if parsed_response.state == 0 {
-            // Успех (state=0)
-            parsed_response.result.ok_or_else(|| {
-                CryptomusError::Serde(
-                    // Это не должно произойти, если API консистентен (state=0 => есть result)
-                    serde::de::Error::missing_field("result"),
-                )
-            })
+            let Some(f) = parsed_response.result else {
+                return Err("dfdf".into());
+            };
+            Ok(f)
         } else {
-            // Успешно распарсили, но API вернул ошибку (state != 0)
-            Err(CryptomusError::ApiError {
-                state: parsed_response.state,
-                message: parsed_response.message,
-                errors: parsed_response.errors,
-            })
+            Err(parsed_response.message.unwrap().into())
         }
     }
 
-    /// Создает новый счет (invoice).
+    /// .
     ///
-    /// # Arguments
+    /// # Errors
     ///
-    /// * `request` - Данные для создания счета.
+    /// This function will return an error if .
     pub async fn create_invoice(
         &self,
         request: &CreateInvoiceRequest,
@@ -327,23 +279,18 @@ impl CryptomusClient {
         self.send_request("payment", request).await
     }
 
-    /// Получает информацию о счете по UUID или Order ID.
+    /// .
     ///
-    /// # Arguments
+    /// # Errors
     ///
-    /// * `request` - Данные для запроса информации (uuid или order_id).
+    /// This function will return an error if .
     pub async fn get_invoice_info(
         &self,
         request: &InvoiceInfoRequest,
     ) -> Result<InvoiceResponse, CryptomusError> {
         // Проверка, что хотя бы одно поле заполнено
         if request.uuid.is_none() && request.order_id.is_none() {
-            return Err(CryptomusError::ApiError {
-                // Возвращаем как ошибку API для консистентности
-                state: 1, // Условно ставим 1
-                message: Some("Необходимо указать uuid или order_id".to_string()),
-                errors: None,
-            });
+            return Err("Необходимо указать uuid или order_id".into());
         }
         self.send_request("payment/info", request).await
     }
