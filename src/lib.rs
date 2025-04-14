@@ -100,7 +100,7 @@ pub struct GenericCryptomusResponse<T> {
 }
 
 // Статус платежа
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PaymentStatus {
     Paid,
@@ -121,6 +121,17 @@ pub enum PaymentStatus {
     #[serde(other)]
     Unknown,
 }
+
+// impl PaymentStatus {
+//     /// Преобразует статус в строку snake_case, используя сериализацию Serde.
+//     /// Возвращает ошибку, если сериализация не удалась (маловероятно для этого enum).
+//     pub fn to_snake_case_string(&self) -> Result<String, serde_json::Error> {
+//         // Сериализуем в JSON строку (например, `"paid_over"`)
+//         let json_string = serde_json::to_string(&self)?;
+//         // Убираем начальную и конечную кавычки
+//         Ok(json_string.trim_matches('"').to_string())
+//     }
+// }
 
 // Структура ответа для счета (invoice)
 #[derive(Deserialize, Debug, Clone)]
