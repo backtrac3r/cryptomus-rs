@@ -36,7 +36,7 @@ pub struct CurrencyNetwork {
 }
 
 // Запрос на создание счета (invoice)
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone, Default)]
 pub struct CreateInvoiceRequest {
     pub amount: String,   // Сумма к оплате (строка, например "10.28")
     pub currency: String, // Код валюты (например, "USD", "USDT", "BTC")
