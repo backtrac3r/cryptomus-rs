@@ -18,16 +18,12 @@ fn generate_signature(payload_str: &str, api_key: &str) -> Result<String, Crypto
         &base64::engine::general_purpose::STANDARD,
         payload_str.as_bytes(),
     );
-    let data_to_sign = format!("{}{}", encoded_payload, api_key);
+    let data_to_sign = format!("{encoded_payload}{api_key}");
     let digest = md5::compute(data_to_sign.as_bytes());
-    Ok(format!("{:x}", digest)) // Возвращаем MD5 в виде hex строки
+    Ok(format!("{digest:x}"))
 }
 
-// --- Модели данных (Запросы и Ответы) ---
-
-// --- Структуры запросов ---
-
-// Структура для списка разрешенных/исключенных валют
+/// Структура для списка разрешенных/исключенных валют
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CurrencyNetwork {
     pub currency: String, // Код валюты
@@ -35,7 +31,7 @@ pub struct CurrencyNetwork {
     pub network: Option<String>, // Код сети (блокчейна)
 }
 
-// Запрос на создание счета (invoice)
+/// Запрос на создание счета (invoice)
 #[derive(Serialize, Debug, Clone, Default)]
 pub struct CreateInvoiceRequest {
     pub amount: String,   // Сумма к оплате (строка, например "10.28")
@@ -252,7 +248,7 @@ impl CryptomusClient {
             let response_text = response
                 .text()
                 .await
-                .unwrap_or_else(|e| format!("Не удалось прочитать тело ответа при ошибке: {}", e));
+                .unwrap_or_else(|e| format!("Не удалось прочитать тело ответа при ошибке: {e}"));
 
             match serde_json::from_str::<GenericCryptomusResponse<()>>(&response_text) {
                 Ok(err_resp) => {
@@ -306,18 +302,10 @@ impl CryptomusClient {
         }
         self.send_request("payment/info", request).await
     }
-
-    // --- Другие методы API можно добавить здесь по аналогии ---
-    // Например, для получения списка услуг, баланса, создания статических кошельков, выплат и т.д.
-    // Не забывайте проверять, какой API ключ нужен для каждого типа операций (Payment или Payout).
 }
-
-// --- Пример использования ---
-// Разместите этот код в main.rs или тестах
 
 // #[tokio::main]
 // async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//     // ВАЖНО: Используйте переменные окружения или другие безопасные способы хранения ключей.
 //     let merchant_id = std::env::var("CRYPTOMUS_MERCHANT_ID").expect("Нужно установить CRYPTOMUS_MERCHANT_ID");
 //     let payment_api_key = std::env::var("CRYPTOMUS_PAYMENT_API_KEY").expect("Нужно установить CRYPTOMUS_PAYMENT_API_KEY");
 
